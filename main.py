@@ -1,0 +1,248 @@
+import pygame
+from spriteCutter import Sprite
+from button_image_class import button
+from buttons import Button
+from color import Color
+from text import Text
+import csv
+clock = pygame.time.Clock()
+FPS = 60
+SCREEN_HEIGHT = 593
+SCREEN_WIDTH = 800
+LOWER_MARGIN = 100
+SIDE_MARGIN = 300
+TILE_SIZE = 22
+cols = 150
+rows = 27
+##scroll variables
+scroll_left = False
+scroll_right = False
+scroll = 0
+scroll_speed = 5
+## check if the button has been clicked
+clicked = False
+##this variable will be used to check if the button is clicked then we will draw the outline on that button
+isclicked = False
+##check if the input field is clicked by a mouse
+trigger_mouse = False
+##check if there was no file found when request to open them
+no_file_directory = False
+##main loop variable
+run = True
+screen = pygame.display.set_mode((SCREEN_WIDTH + SIDE_MARGIN,SCREEN_HEIGHT + LOWER_MARGIN))
+pygame.display.set_caption('Level Editor')
+background_1 = pygame.image.load("./img/1.png").convert_alpha()
+background_2 = pygame.image.load("./img/2.png").convert_alpha()
+background_3 = pygame.image.load("./img/3.png").convert_alpha()
+background_4 = pygame.image.load("./img/4.png").convert_alpha()
+side_margin = pygame.Rect(SCREEN_WIDTH,0,SIDE_MARGIN,SCREEN_HEIGHT)
+lower_margin = pygame.Rect(0,SCREEN_HEIGHT,SCREEN_WIDTH + SIDE_MARGIN,LOWER_MARGIN)
+level = 0
+##loading the tiles using sprite sheet
+current_button = 0
+sprite1_list = Sprite.getSprite(pygame.image.load("./img/sprite1.jpg"),22,22,5,Color.Black)
+sprite2_list = Sprite.getSprite(pygame.image.load("./img/sprite2.jpg"),22,22,5,Color.Black)
+sprite3_list = Sprite.getSprite(pygame.image.load("./img/sprite3.jpg"),22,22,5,Color.Black)
+button_list = []
+button_list1 = []
+button_list2 = []
+button_list3 = []
+world_data = []
+save_button = Button(50,SCREEN_HEIGHT + 50,50,30,"Save")
+open_button = Button(150,SCREEN_HEIGHT+ 50,50,30,"Open")
+msg = Text(10,SCREEN_HEIGHT + 20,"Press the Up key to increase the level and down key to decrease the level",Color.White,15)
+file_directory = ''
+default_directory = 'maps/'
+input_field = pygame.Rect(SCREEN_WIDTH + 10,SCREEN_HEIGHT//2 - 100,SIDE_MARGIN - 30,50)
+warning_msg = Text(10,0,"No such file directory",Color.Yellow,30)
+##create world data rows and cols and assaign -1 as empty part
+for row in range(rows):
+    r = [-1] * cols
+    world_data.append(r)
+## create the ground on the last row in world data by assaign 0 as the ground tile
+for tile in range(cols):
+    world_data[rows- 1][tile] = 9
+    
+def buttonListConverter(lst):
+    new_list = []
+    for i in lst:
+        new_list.append(button(i))
+    return new_list
+
+##this function will split item depend on the wanted_parts specified
+def slipt(alist,wanted_parts = 1):
+    new_list = []
+    next_list = 0
+    loopTimes = len(alist)// wanted_parts
+
+    for i in range(loopTimes):
+        new_list.append(alist[next_list:wanted_parts+next_list])
+        next_list += wanted_parts
+    return new_list
+
+##get the list converted to button class
+button_list1.extend(buttonListConverter(sprite1_list))
+button_list2.extend(buttonListConverter(sprite2_list))
+button_list3.extend(buttonListConverter(sprite3_list))
+button_list.extend(button_list1)
+button_list.extend(button_list2)
+button_list.extend(button_list3)
+
+def draw():
+    screen.fill(Color.White)
+    for i in range(4):
+        screen.blit(background_1,(i * background_1.get_width() - scroll* 0.3,0))
+        screen.blit(background_2,(i * background_2.get_width() - scroll* 0.4,280))
+        screen.blit(background_3,(i * background_3.get_width() - scroll* 0.5,340))
+        screen.blit(background_4,(i * (background_3.get_width()- 36) - scroll* 0.6,450))
+    
+def drawGrid():
+    ## draw Horizontal lines
+    for i in range(cols+1):
+        pygame.draw.line(screen,Color.White,(i * TILE_SIZE - scroll,0),(i * TILE_SIZE - scroll, SCREEN_HEIGHT),1)
+
+## draw Vertical lines
+    for i in range(rows):
+        pygame.draw.line(screen,Color.White,(0,i * TILE_SIZE),(SCREEN_WIDTH,i * TILE_SIZE),1)
+def drawWorldTile():
+    global screen
+##    we choose the first enumarate to be y because are rows example on the table the row are draw in y axis
+    for y,row in enumerate(world_data):
+        for x,col in enumerate(row):
+            if col >= 0:
+##                we minus the scroll variable inorder for the time to scroll
+                screen.blit(button_list[col].button,(x* TILE_SIZE - scroll,y* TILE_SIZE))
+        
+
+while run:
+    clock.tick(FPS)
+    draw()
+    drawGrid()
+    drawWorldTile()
+##    scroll the map
+    if scroll_left and scroll > 0:
+        scroll -= scroll_speed
+    if scroll_right and scroll < (cols* TILE_SIZE- SCREEN_WIDTH):
+        scroll += scroll_speed
+##    draw the side margin white
+    pygame.draw.rect(screen,Color.Green,side_margin)
+    pygame.draw.rect(screen,Color.Green,lower_margin)
+    level_text = Text(10,SCREEN_HEIGHT + 5,f"Level:{level}",Color.White,15)
+    level_text.draw(screen)
+    msg.draw(screen)
+    ##    draw the text of the file directory entered by a user
+    file_directory_text = Text(input_field.x,input_field.y,file_directory,Color.White,30)
+    
+## draw the input field
+    pygame.draw.rect(screen,Color.Gray,input_field)
+##    save button draw and check if is clicked write the new file
+    if (save_button.draw(screen)):
+        ##if save click save the file
+        try:
+            no_file_directory = False
+            current_directory = ''
+            if len(file_directory) == 0:
+                current_directory = default_directory + "Level"
+            else:
+                current_directory = file_directory
+            with open(f'{current_directory}_{level}','w',newline = '') as csvfile:
+                writer = csv.writer(csvfile,delimiter = ',')
+                for row in world_data:
+                    writer.writerow(row)
+        except FileNotFoundError:
+            warning_msg = "Data not saved please check your path"
+##  open button draw and check if is clicked open the file specified by a level number
+    if (open_button.draw(screen)):
+##        first we try to open if the file is exist or not if not print the warning message
+        try:
+            no_file_directory = False
+            current_directory = ''
+            if len(file_directory) == 0:
+                current_directory = default_directory
+            else:
+                current_directory = file_directory
+            with open(f'{current_directory}_{level}',newline = '') as csvfile:
+                reader = csv.reader(csvfile,delimiter = ',')
+                for x,row in enumerate(reader):
+                    for y,tile in enumerate(row):
+                        world_data[x][y] = int(tile)
+        except FileNotFoundError:
+            no_file_directory = True
+
+
+##  print the error for the file not found
+    if no_file_directory:
+        warning_msg.draw(screen)
+## draw buttons the draw method will return if the button is clicked so we check it    
+    for j,i in enumerate(button_list1):
+        if(i.draw(screen,SCREEN_WIDTH + (TILE_SIZE * j * 2) + 50,SCREEN_HEIGHT//2)):
+            current_button = j
+            isclicked = True
+    
+    for j,i in enumerate(button_list2):
+        if(i.draw(screen,SCREEN_WIDTH + (TILE_SIZE * j * 2)+ 50,SCREEN_HEIGHT//2+ TILE_SIZE + 10)):
+            current_button = j+ 5
+            isclicked = True
+    for j,i in enumerate(button_list3):
+        if(i.draw(screen,SCREEN_WIDTH + (TILE_SIZE * j * 2) + 50,SCREEN_HEIGHT//2 + (TILE_SIZE* 2) + 20)):
+            current_button = j+ 10
+            isclicked = True
+##    draw the outline of the current button clicked
+    if isclicked:
+        pygame.draw.rect(screen,(255,255,255),button_list[current_button].rect,True)
+
+
+
+##    get the current mouse position
+    pos = pygame.mouse.get_pos()
+##    change the position of the mouse to be like our grid
+    x = (pos[0] + scroll) // TILE_SIZE
+    y = pos[1] // TILE_SIZE
+
+##    change the tile grid when mouse is clicked but first we want the pos of the mouse to be inside the grid window and not the side margin or left margin
+    if pos[0] < SCREEN_WIDTH and pos[1] < SCREEN_HEIGHT:
+        if pygame.mouse.get_pressed()[0] == 1:
+            if world_data[y][x] != current_button:
+                world_data[y][x] = current_button
+
+        if pygame.mouse.get_pressed()[2] == 1:
+            world_data[y][x] = -1
+##    check if the cusor ins on the input field box then we check if the  mouse if pressed
+    if input_field.collidepoint(pos):
+        if pygame.mouse.get_pressed()[0] == 1:
+            trigger_mouse = True
+                    
+##  event loop
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+    
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                file_directory = file_directory[:-1]
+            elif event.key == pygame.K_RETURN:
+                trigger_mouse = False
+            elif trigger_mouse:
+                file_directory += event.unicode
+            
+            if event.key == pygame.K_LEFT:
+                scroll_left = True
+            if event.key == pygame.K_RIGHT:
+                scroll_right = True
+            if event.key == pygame.K_UP:
+                level += 1
+            if event.key == pygame.K_DOWN:
+                if level > 0:
+                    level -= 1
+                
+            if event.key == pygame.K_SPACE:
+                scroll_speed = 10
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_LEFT:
+                scroll_left = False
+            if event.key == pygame.K_RIGHT:
+                scroll_right = False
+            if event.key == pygame.K_SPACE:
+                scroll_speed = 5
+    file_directory_text.draw(screen)
+    pygame.display.flip()
